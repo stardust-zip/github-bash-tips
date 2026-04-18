@@ -1,5 +1,5 @@
 export default function handler(req, res) {
-  // 1. Array of Bash/DevOps tips (Upgraded with common tools)
+  // 1. Array of Bash/DevOps tips
   const tips = [
     { cmd: "ctrl + r", desc: "Reverse search your command history." },
     { cmd: "sudo !!", desc: "Run the previous command with sudo privileges." },
@@ -41,26 +41,42 @@ export default function handler(req, res) {
                  .replace(/'/g, '&apos;');
   };
 
-  // 4. Gruvbox Rainbow Text Generator
-  const makeRainbow = (text) => {
-    // Light Gruvbox palette looks best against the dark #282828 background
-    const colors = ['#fb4934', '#fe8019', '#fabd2f', '#b8bb26', '#8ec07c', '#83a598', '#d3869b'];
-    let colorIndex = 0;
-    
-    return text.split('').map(char => {
-      if (char === ' ') return ' '; // Preserve spaces without markup
-      const color = colors[colorIndex % colors.length];
-      colorIndex++;
-      return `<tspan fill="${color}">${escapeXml(char)}</tspan>`;
-    }).join('');
+  // 4. Gruvbox Syntax Highlighter
+  const syntaxHighlight = (cmdStr) => {
+    const tokens = cmdStr.split(' ');
+    let expectCommand = true;
+
+    return tokens.map(token => {
+      let color = '#ebdbb2'; // Default foreground
+      
+      // Operators pipe/and reset the expectation for the next word to be a command
+      if (token === '&&' || token === '|' || token === '||') {
+        color = '#fe8019'; // Orange for operators
+        expectCommand = true;
+      } 
+      else if (expectCommand) {
+        color = '#b8bb26'; // Green for commands
+        expectCommand = false;
+        // If the command is sudo, the next word is the actual command
+        if (token === 'sudo') expectCommand = true;
+      } 
+      else if (token.startsWith('-')) {
+        color = '#8ec07c'; // Aqua for flags (e.g., -a, --oneline)
+      } 
+      else {
+        color = '#d3869b'; // Purple for arguments, paths, and strings
+      }
+
+      return `<tspan fill="${color}">${escapeXml(token)}</tspan>`;
+    }).join(' ');
   };
 
   // 5. Safely prepare texts and prefixes
-  const safeCmd = escapeXml(randomTip.cmd);
   const safeDesc = escapeXml(randomTip.desc);
   
-  const rawPrefix = `${safeCmd} : `;
-  const rainbowPrefix = `${makeRainbow(randomTip.cmd)} <tspan fill="#a89984">:</tspan> `;
+  const rawPrefix = `${randomTip.cmd} : `;
+  // Apply syntax highlighting to the command part
+  const highlightedPrefix = `${syntaxHighlight(randomTip.cmd)} <tspan fill="#a89984">:</tspan> `;
 
   // 6. Smart Word Wrapper Function
   const wrapTextWithPrefix = (prefix, text, maxChars) => {
@@ -69,6 +85,7 @@ export default function handler(req, res) {
     let currentLine = prefix;
 
     words.forEach(word => {
+      // Use a rough estimate for visual length since SVG <text> doesn't auto-wrap
       if ((currentLine + word).length > maxChars) {
         lines.push(currentLine.trim());
         currentLine = '    ' + word + ' '; // Indent subsequent lines by 4 spaces
@@ -83,11 +100,11 @@ export default function handler(req, res) {
   // Wrap text maxing out at 75 characters
   const wrappedLines = wrapTextWithPrefix(rawPrefix, safeDesc, 75);
 
-  // Inject the rainbow prefix ONLY into the first line
-  wrappedLines[0] = wrappedLines[0].replace(rawPrefix, rainbowPrefix);
+  // Inject the highlighted prefix ONLY into the first line
+  wrappedLines[0] = wrappedLines[0].replace(rawPrefix, highlightedPrefix);
 
   // 7. Dynamic Height Calculation
-  const lineHeight = 25;
+  const lineHeight = 28; // Increased slightly to accommodate bold text breathing room
   const svgHeight = 130 + (wrappedLines.length - 1) * lineHeight;
 
   // Generate the <text> XML for each line
@@ -96,16 +113,21 @@ export default function handler(req, res) {
   }).join('');
 
   // 8. The SVG Template
+  // Notice font-weight: bold is now applied globally to .terminal-text
   const svg = `
   <svg width="850" height="${svgHeight}" viewBox="0 0 850 ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
     <style>
-      .terminal-text { font-family: 'Fira Code', 'Courier New', Courier, monospace; font-size: 18px; }
+      .terminal-text { 
+        font-family: 'Fira Code', 'Courier New', Courier, monospace; 
+        font-size: 18px; 
+        font-weight: bold; 
+      }
       .bg { fill: #282828; }
-      .user { fill: #b8bb26; font-weight: bold; }
-      .dir { fill: #83a598; font-weight: bold; }
-      .arrow { fill: #fe8019; font-weight: bold;}
+      .user { fill: #b8bb26; }
+      .dir { fill: #83a598; }
+      .arrow { fill: #fe8019; }
       .cmd { fill: #ebdbb2; }
-      .desc { fill: #ebdbb2; } /* Gruvbox light foreground for descriptions */
+      .desc { fill: #ebdbb2; } 
     </style>
 
     <rect width="850" height="${svgHeight}" rx="10" class="bg" />
