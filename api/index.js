@@ -1,22 +1,38 @@
 export default function handler(req, res) {
-  // 1. Your array of Bash/DevOps tips
+  // 1. Array of Bash/DevOps tips (Upgraded with common tools)
   const tips = [
-    "ctrl + r : Reverse search your command history.",
-    "sudo !! : Run the last command as root.",
-    "^foo^bar : Replace 'foo' with 'bar' in the last command.",
-    "cd - : Go back to the previous directory.",
-    "disown -a && exit : Keep background jobs running after logout.",
-    "python3 -m http.server : Start a quick web server on port 8000.",
-    "find . -type f -mmin -60 : Find files modified in the last hour.",
-    "netstat -tulpn : Show listening ports and their PIDs.",
-    "chmod 777 . : (Just kidding, please don't do this).",
-    "history | awk '{CMD[$2]++;count++}END { for (a in CMD)print CMD[a] \" \" CMD[a]/count*100 \"% \" a;}' | grep -v \"./\" | column -c3 -s \" \" -t | sort -nr | nl | head -n10 : List your top 10 most used commands."
+    { cmd: "ctrl + r", desc: "Reverse search your command history." },
+    { cmd: "sudo !!", desc: "Run the previous command with sudo privileges." },
+    { cmd: "^foo^bar", desc: "Replace 'foo' with 'bar' in the last command." },
+    { cmd: "cd -", desc: "Go back to the previously working directory." },
+    { cmd: "disown -a && exit", desc: "Keep background jobs running after logout." },
+    { cmd: "python3 -m http.server", desc: "Start a quick web server on port 8000." },
+    { cmd: "find . -type f -mmin -60", desc: "Find files modified in the last 60 minutes." },
+    { cmd: "netstat -tulpn", desc: "Show listening ports and their associated PIDs." },
+    { cmd: "git log --graph --oneline --all", desc: "View a compact, graphical representation of your git commit history." },
+    { cmd: "docker system prune -a", desc: "Remove all unused Docker containers, networks, images, and volumes." },
+    { cmd: "lsof -i :8080", desc: "Find out which process is listening on port 8080." },
+    { cmd: "tar -xzvf file.tar.gz", desc: "Extract a gzipped tar archive with verbose output." },
+    { cmd: "grep -rnw '/path' -e 'pattern'", desc: "Recursively search for a specific string inside files." },
+    { cmd: "df -h", desc: "Display human-readable disk space usage for all mounted filesystems." },
+    { cmd: "du -sh * | sort -hr", desc: "List sizes of files and folders in the current directory, sorted by largest." },
+    { cmd: "tail -f /var/log/syslog", desc: "Follow a log file in real-time as new lines are added." },
+    { cmd: "chmod +x script.sh", desc: "Make a script executable." },
+    { cmd: "chown user:group file", desc: "Change the owner and group of a file." },
+    { cmd: "ssh-copy-id user@host", desc: "Copy your SSH public key to a remote machine for passwordless login." },
+    { cmd: "rsync -avz local/ remote:/path", desc: "Synchronize files securely and efficiently between local and remote." },
+    { cmd: "ps aux | grep node", desc: "Find all running processes related to 'node'." },
+    { cmd: "history | grep 'docker'", desc: "Search your command history for previously used docker commands." },
+    { cmd: "sed -i 's/old/new/g' file.txt", desc: "Replace all occurrences of 'old' with 'new' inside a file directly." },
+    { cmd: "awk '{print $1}' file.txt", desc: "Print only the first column of each line in a text file." },
+    { cmd: "jq '.' file.json", desc: "Pretty-print and colorize a JSON file in the terminal." },
+    { cmd: "kubectl get pods -A", desc: "List all pods across all namespaces in a Kubernetes cluster." }
   ];
 
   // 2. Pick a random tip
   const randomTip = tips[Math.floor(Math.random() * tips.length)];
 
-  // 3. Escape special XML characters
+  // 3. Escape special XML characters helper
   const escapeXml = (unsafe) => {
     return unsafe.replace(/&/g, '&amp;')
                  .replace(/</g, '&lt;')
@@ -25,19 +41,37 @@ export default function handler(req, res) {
                  .replace(/'/g, '&apos;');
   };
 
-  const safeTip = escapeXml(randomTip);
+  // 4. Gruvbox Rainbow Text Generator
+  const makeRainbow = (text) => {
+    // Light Gruvbox palette looks best against the dark #282828 background
+    const colors = ['#fb4934', '#fe8019', '#fabd2f', '#b8bb26', '#8ec07c', '#83a598', '#d3869b'];
+    let colorIndex = 0;
+    
+    return text.split('').map(char => {
+      if (char === ' ') return ' '; // Preserve spaces without markup
+      const color = colors[colorIndex % colors.length];
+      colorIndex++;
+      return `<tspan fill="${color}">${escapeXml(char)}</tspan>`;
+    }).join('');
+  };
 
-  // 4. The Word Wrapper Function
-  // Splits long text into an array of lines, breaking at spaces
-  const wrapText = (text, maxChars) => {
+  // 5. Safely prepare texts and prefixes
+  const safeCmd = escapeXml(randomTip.cmd);
+  const safeDesc = escapeXml(randomTip.desc);
+  
+  const rawPrefix = `${safeCmd} : `;
+  const rainbowPrefix = `${makeRainbow(randomTip.cmd)} <tspan fill="#a89984">:</tspan> `;
+
+  // 6. Smart Word Wrapper Function
+  const wrapTextWithPrefix = (prefix, text, maxChars) => {
     const words = text.split(' ');
     let lines = [];
-    let currentLine = '';
+    let currentLine = prefix;
 
     words.forEach(word => {
       if ((currentLine + word).length > maxChars) {
         lines.push(currentLine.trim());
-        currentLine = word + ' ';
+        currentLine = '    ' + word + ' '; // Indent subsequent lines by 4 spaces
       } else {
         currentLine += word + ' ';
       }
@@ -46,20 +80,22 @@ export default function handler(req, res) {
     return lines;
   };
 
-  // Wrap the tip at 75 characters max per line
-  const wrappedLines = wrapText(safeTip, 75);
+  // Wrap text maxing out at 75 characters
+  const wrappedLines = wrapTextWithPrefix(rawPrefix, safeDesc, 75);
 
-  // 5. Dynamic Height Calculation
-  // Base height is 130px. Add 25px for every extra line of text.
+  // Inject the rainbow prefix ONLY into the first line
+  wrappedLines[0] = wrappedLines[0].replace(rawPrefix, rainbowPrefix);
+
+  // 7. Dynamic Height Calculation
   const lineHeight = 25;
   const svgHeight = 130 + (wrappedLines.length - 1) * lineHeight;
 
   // Generate the <text> XML for each line
   const tipTextElements = wrappedLines.map((line, index) => {
-    return `<text x="25" y="${120 + (index * lineHeight)}" class="terminal-text tip">${line}</text>`;
+    return `<text x="25" y="${120 + (index * lineHeight)}" class="terminal-text desc">${line}</text>`;
   }).join('');
 
-  // 6. The SVG Template
+  // 8. The SVG Template
   const svg = `
   <svg width="850" height="${svgHeight}" viewBox="0 0 850 ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
     <style>
@@ -69,7 +105,7 @@ export default function handler(req, res) {
       .dir { fill: #83a598; font-weight: bold; }
       .arrow { fill: #fe8019; font-weight: bold;}
       .cmd { fill: #ebdbb2; }
-      .tip { fill: #fabd2f; font-weight: bold; }
+      .desc { fill: #ebdbb2; } /* Gruvbox light foreground for descriptions */
     </style>
 
     <rect width="850" height="${svgHeight}" rx="10" class="bg" />
@@ -91,10 +127,10 @@ export default function handler(req, res) {
   </svg>
   `;
 
-  // 7. The Cache Busters
+  // 9. Cache Busters & Response Header
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'no-cache, max-age=0, s-maxage=0, stale-while-revalidate');
 
-  // 8. Send the image
+  // 10. Send the image
   res.status(200).send(svg);
 }
